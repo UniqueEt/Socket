@@ -94,7 +94,7 @@ void str_cli2(FILE* fp , int sockfd)
 				close(sockfd); /*all done*/
 				return ;
 			}//if
-			sendline[strlen(sendline) - 1] = '\0';
+			//sendline[strlen(sendline) - 1] = '\0';
 			write(sockfd , sendline , strlen(sendline));
 		}//if
 
@@ -154,8 +154,8 @@ int main(int argc , char **argv)
     }//if
 
 	/*调用普通消息处理函数*/
-	str_cli(sockfd);	
+	//str_cli(sockfd);	
 	/*调用采用select技术的消息处理函数*/
-	//str_cli2(stdin , sockfd);
+	str_cli2(stdin , sockfd);
 	exit(0);
 }

@@ -85,18 +85,45 @@ void str_cli(int sockfd)
 
 void str2_cli(int sockfd)
 {
-	int maxi;
-	int nready;
+	int nread, nready;
 	struct pollfd pfd[OPEN_MAX];
-	//nfds_t 
 	char sendline[MAX_LINE], recvline[MAX_LINE];
 	
-	maxi = 0;
+	//不像select，不需要放进循环内
+	pfd[0].fd = fileno(stdin);
+	pfd[0].events = POLLIN;
+	pfd[1].fd = sockfd;
+	pfd[1].events = POLLIN;
 
 	while (1)
 	{
-		nready = poll(pfd, maxi + 1, INFTIM);
-		if(pfd->revents & )
+		nready = poll(pfd, 2, INFTIM);
+		
+		//标准输入流fd发生变化
+		if (pfd[0].revents & POLLIN)
+		{
+			if ((nread = read(pfd[0].fd, sendline, MAX_LINE)) == 0)
+			{
+				printf("read nothing\n");
+				close(fileno(stdin));
+				return;
+			}
+			write(sockfd, sendline, nread);
+		}
+		//连接套接字sockfd发生变化
+		if (pfd[1].revents & POLLIN)
+		{
+			if (readline(sockfd, recvline, MAX_LINE) == 0)
+			{
+				printf("Server terminated prematurely");
+				exit(1);
+			}
+			if (fputs(recvline, stdout) == EOF)
+			{
+				perror("fputs error");
+				exit(1);
+			}
+		}
 	}
 }
 
@@ -138,6 +165,10 @@ int main(int argc, char **argv)
 	}//if
 
 	/*调用消息处理函数*/
-	str_cli(sockfd);
+	//str_cli(sockfd);
+
+	/*使用poll的消息处理函数*/
+	str2_cli(sockfd);
+
 	exit(0);
 }

@@ -69,6 +69,7 @@ int main(int argc , char **argv)
 	/*(5) 进入服务器接收请求死循环*/
 	while(1)
 	{
+		printf("waiting for the client fd changed\n");
 		nready = poll(client , maxi+1 , INFTIM);
 		
 		if(client[0].revents & POLLRDNORM)
@@ -124,10 +125,12 @@ int main(int argc , char **argv)
 				bzero(buf , MAX_LINE);
 				if((n = read(sockfd , buf , MAX_LINE)) <= 0)
 				{
+					printf("client close the socket,sockfd = %d\n", sockfd);
 					close(sockfd);				
 					client[i].fd = -1;
 				}//if
-				else{
+				else
+				{
 					printf("clint[%d] send message: %s\n", i , buf);
 					if((ret = write(sockfd , buf , n)) != n)	
 					{

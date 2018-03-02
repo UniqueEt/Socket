@@ -7,17 +7,43 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <sys/types.h>
+#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <fcntl.h>
 
+
+#ifndef CONNECT_SIZE
+#define CONNECT_SIZE 256
+#endif
+
 #define PORT 7777
 #define MAX_LINE 2048
+
+#define MAX_EVENT 20
 
 int max(int a , int b)
 {
 	return a > b ? a : b;
+}
+
+void setNonblocking(int sockfd)
+{
+	int opts;
+	opts = fcntl(sockfd, F_GETFL);
+	if (opts<0)
+	{
+		perror("fcntl(sock,GETFL)");
+		return;
+	}//if
+
+	opts = opts | O_NONBLOCK;
+	if (fcntl(sockfd, F_SETFL, opts)<0)
+	{
+		perror("fcntl(sock,SETFL,opts)");
+		return;
+	}//if
 }
 
 /*readline函数实现*/
@@ -27,15 +53,20 @@ ssize_t readline(int fd, char *vptr, size_t maxlen)
 	char	c, *ptr;
 
 	ptr = vptr;
-	for (n = 1; n < maxlen; n++) {
-		if ( (rc = read(fd, &c,1)) == 1) {
+	for (n = 1; n < maxlen; n++) 
+	{
+		if ( (rc = read(fd, &c,1)) == 1) 
+		{
 			*ptr++ = c;
 			if (c == '\n')
 				break;	/* newline is stored, like fgets() */
-		} else if (rc == 0) {
+		}
+		else if (rc == 0)
+		{
 			*ptr = 0;
 			return(n - 1);	/* EOF, n - 1 bytes were read */
-		} else
+		} 
+		else
 			return(-1);		/* error, errno set by read() */
 	}
 
@@ -67,6 +98,27 @@ void str_cli(int sockfd)
 
 		bzero(sendline , MAX_LINE);
 	}//while
+}
+
+void str2_cli(int sockfd)
+{
+	struct epoll_event ev, event[MAX_EVENT];
+
+	int epfd = epoll_create(CONNECT_SIZE);
+
+	setNonblocking(sockfd);
+	/*设置监听描述符*/
+	ev.data.fd = sockfd;
+	/*设置处理事件类型*/
+	ev.events = EPOLLIN | EPOLLET;
+	/*注册监听标准输入流stdin事件*/
+	epoll_ctl(epfd, EPOLL_CTL_ADD, fileno(stdin), &ev);
+	/*注册监听连接套接字事件*/
+	epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev);
+
+	epoll_wait(epfd, event, CONNECT_SIZE, -1);
+
+	close(epfd);
 }
 
 int main(int argc , char **argv)

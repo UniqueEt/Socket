@@ -111,7 +111,8 @@ int main(int argc , char **argv)
 				epoll_ctl(epfd , EPOLL_CTL_ADD , connfd , &ev);
 			}//if
 			/*如果是已链接用户，并且收到数据，进行读入*/
-			else if(events[i].events & EPOLLIN){
+			else if(events[i].events & EPOLLIN)
+			{
 
 				if((sockfd = events[i].data.fd) < 0)
 					continue;
@@ -122,7 +123,8 @@ int main(int argc , char **argv)
 					close(sockfd);
 					events[i].data.fd = -1;
 				}//if
-				else{
+				else
+				{
 					buf[n] = '\0';
 					printf("clint[%d] send message: %s\n", i , buf);
 				

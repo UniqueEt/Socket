@@ -120,6 +120,7 @@ int main(int argc , char **argv)
 				printf("reading the socket~~~\n");
 				if((n = read(sockfd , buf , MAX_LINE)) <= 0)
 				{
+					printf("client close the socket,sockfd = %d\n", sockfd);
 					close(sockfd);
 					events[i].data.fd = -1;
 				}//if

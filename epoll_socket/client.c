@@ -102,7 +102,11 @@ void str_cli(int sockfd)
 
 void str2_cli(int sockfd)
 {
-	struct epoll_event ev, event[MAX_EVENT];
+	int i, nfds, nread;
+	char sendline[MAX_LINE], recvline[MAX_LINE];
+	struct epoll_event ev, ev_in, event[MAX_EVENT];
+
+	int infd = fileno(stdin);
 
 	int epfd = epoll_create(CONNECT_SIZE);
 
@@ -111,14 +115,53 @@ void str2_cli(int sockfd)
 	ev.data.fd = sockfd;
 	/*设置处理事件类型*/
 	ev.events = EPOLLIN | EPOLLET;
+
+	setNonblocking(infd);
+	ev_in.data.fd = infd;
+	ev_in.events = EPOLLIN | EPOLLET;
 	/*注册监听标准输入流stdin事件*/
-	epoll_ctl(epfd, EPOLL_CTL_ADD, fileno(stdin), &ev);
+	epoll_ctl(epfd, EPOLL_CTL_ADD, infd, &ev_in);
 	/*注册监听连接套接字事件*/
 	epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev);
 
-	epoll_wait(epfd, event, CONNECT_SIZE, -1);
+	while (1)
+	{
+		nfds = epoll_wait(epfd, event, CONNECT_SIZE, -1);
 
-	close(epfd);
+		printf("events triggered,nfds = %d\n", nfds);
+
+		for (i = 0; i < nfds; ++i)
+		{
+			if (event[i].data.fd == infd)
+			{
+				if ((nread = read(infd, sendline, MAX_LINE)) == 0)
+				{
+					printf("read nothing\n");
+					close(infd);
+					return;
+				}
+				printf("send message to server\n");
+
+				//即使服务端强制中断（ctrl+z），write还是可以正常向sockfd写入
+				write(sockfd, sendline, nread);
+			}
+			else if (event[i].data.fd == sockfd)
+			{
+				//貌似服务端关闭了套接字会向客户端发送EOF,但是如果是服务器强制中断（ctrl+z）,sockfd状态不会改变，走不到这里
+				if (readline(sockfd, recvline, MAX_LINE) == 0)
+				{
+					printf("server closed prematurely\n");
+					exit(1);
+				}
+				printf("receive message from server\n");
+				if (fputs(recvline, stdout) == EOF)
+				{
+					perror("fputs error\n");
+					exit(1);
+				}
+			}
+		}
+	}
 }
 
 int main(int argc , char **argv)
@@ -159,6 +202,9 @@ int main(int argc , char **argv)
     }//if
 
 	/*调用消息处理函数*/
-	str_cli(sockfd);	
+	//str_cli(sockfd);	
+	/*调用epoll技术处理消息函数*/
+	str2_cli(sockfd);
+
 	exit(0);
 }

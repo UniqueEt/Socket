@@ -37,7 +37,7 @@
 #define LISTENEQ  6000
  
 /*预定义数据库名称*/
-#define DB_NAME "/home/onlyet/mount/Socket/chat_room_select/chatRome.db"
+#define DB_NAME "/home/onlyet/database/chat_rome.db"
 
 /*标志*/
 enum Flag{
@@ -109,4 +109,13 @@ ListNode *userList;
 
 extern char *stateMsg(int stateRet);
 extern void copyUser(User *user1 , User *user2);
+
+/*chat.c*/
+extern void recvMsg(int *sockfd);
+extern void enterChat(User *user, int sockfd);
+
+/*interface.c*/
+extern int mainInterface();
+extern int helpInterface();
+extern void chatInterface(char userName[]);
 

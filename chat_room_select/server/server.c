@@ -41,6 +41,8 @@ int main(void)
 	socklen_t clilen;
 
 	pthread_t pid;
+	pthread_cond_t pcond;
+	pthread_mutex_t pmtx;
 
 	/*套接字选项*/
 	int opt = 1;
@@ -60,6 +62,10 @@ int main(void)
 
 	/*UserInfo*/
 	User user;	
+
+	/*初始化互斥锁和条件变量*/
+	pthread_cond_init(&pcond, NULL);
+	pthread_mutex_init(&pmtx, NULL);
 
 	/*(1) 创建套接字*/
 	if((listenfd = socket(AF_INET , SOCK_STREAM , 0)) == -1)
@@ -170,15 +176,28 @@ int main(void)
 				if(--nready < 0)
 					break;							
 				pthread_create(&pid , NULL , (void *)handleRequest , (void *)&sockfd);
+				pthread_detach(pid);
 				pthread_join(pid, NULL);
 			}//if
-			/*清除处理完的链接描述符*/
+
+			/*将sockfd从文件描述符集allset中移除*/
 			FD_CLR(sockfd , &allset);
 			client_sockfd[i] = -1;			
 		}//for
+
+		 /*等待子线程结束信号*/
+		pthread_mutex_lock(&pmtx);
+		pthread_cond_wait(&pcond, &pmtx);
+		pthread_mutex_unlock(&pmtx);
+
 	}//while
 		
 	close(listenfd);
+
+	/*释放互斥锁和条件变量*/
+	pthread_cond_destroy(&pcond);
+	pthread_mutex_destroy(&pmtx);
+
 	return 0;
 }
 
@@ -268,5 +287,6 @@ void* handleRequest(int *fd)
 
 	close(sockfd);
 	//*fd = -1;
+
 	return NULL;
 }

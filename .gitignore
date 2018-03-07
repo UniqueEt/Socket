@@ -36,3 +36,6 @@
 LinuxChatRoom.sln
 LinuxChatRoom.vcxproj
 LinuxChatRoom.vcxproj.filters
+
+/include
+#chat_room_select

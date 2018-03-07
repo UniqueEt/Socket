@@ -37,7 +37,7 @@
 #define LISTENEQ  6000
  
 /*预定义数据库名称*/
-#define DB_NAME "/home/onlyet/mount/Socket/chat_room_select/chatRome.db"
+#define DB_NAME "/home/onlyet/database/chat_room.db"
 
 /*标志*/
 enum Flag{

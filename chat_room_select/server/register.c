@@ -25,7 +25,7 @@ int registerUser(Message *msg , int sockfd)
 	const char *tail;
 
 	/*声明sql语句存储变量*/
-	char sql[128];
+	char sql[1024];
 
 	/*当前系统时间*/
 	time_t timeNow;
@@ -45,6 +45,7 @@ int registerUser(Message *msg , int sockfd)
 	
 	if(strlen(user.userName) > 20)
 	{	
+		fprintf(stderr, "register failed, userName must less than or equal to 20 bytes\n");
 		return INVALID;
 	}//if
 
@@ -52,57 +53,72 @@ int registerUser(Message *msg , int sockfd)
 	ret = sqlite3_open(DB_NAME, &db);
 	if(ret != SQLITE_OK)
 	{
-		printf("unable open database.\n");
+		fprintf(stderr, "sqlite3_open failed, [%s]\n", sqlite3_errmsg(db));
+		sqlite3_close(db);
 		return FAILED;
 	}//if
 	printf("Opened database successfully.\n");
 
 	/*（2）检查要注册用户名是否已存在？*/
 	memset(sql , 0 , sizeof(sql));
-	sprintf(sql , "select * from User where userName='%s';",(user.userName));
+	sprintf(sql , "select * from user where userName='%s';",(user.userName));
 
-	ret = sqlite3_prepare(db , sql , strlen(sql) , &stmt , &tail);	
+	/*
+	 *Before an SQL statement is executed, it must be first compiled into a byte-code with one of the sqlite3_prepare* functions.
+	 *(The sqlite3_prepare() function is deprecated.)
+	*/
+	ret = sqlite3_prepare_v2(db , sql , strlen(sql) , &stmt , &tail);	
 	if(ret != SQLITE_OK)
 	{
-		ret = sqlite3_step(stmt);
-		sqlite3_finalize(stmt);
+		fprintf(stderr, "1 sqlite3_prepare_v2 failed, [%s]\n", sqlite3_errmsg(db));
 		sqlite3_close(db);
-		printf("database select fail!\n");
 		return FAILED;
 	}//if
-	/*执行*/
+
+	/*
+	 * runs the SQL statement
+	 * Our SQL statement returns only one row of data, therefore, we call this function only once
+	*/
 	ret = sqlite3_step(stmt);
-	//如果有数据则返回SQLITE_ROW，当到达末尾返回SQLITE_DONE
-	 while (ret == SQLITE_ROW)
-	 {
-	     ret = sqlite3_step(stmt);
-		 sqlite3_finalize(stmt);
-		 sqlite3_close(db);
-		 return FAILED;
-	 }
+	if (ret == SQLITE_ROW)
+	{
+		fprintf(stderr, "1 sqlite3_step failed, [%s]\n", sqlite3_column_text(stmt, 0));
+		printf("该用户已存在\n");
+		sqlite3_close(db);
+		return FAILED;
+	}
 	/*销毁句柄，关闭数据库*/
 	sqlite3_finalize(stmt);
 
 	/*执行插入操作*/
 	memset(sql , 0 , sizeof(sql));
 	time(&timeNow);
-	sprintf(sql , "insert into User(userName , password , userAddr , sockfd , speak , registerTime)\
+	sprintf(sql , "insert into user(userName , password , userAddr , sockfd , speak , registerTime)\
 			values('%s','%s','%s',%d, %d , '%s');",user.userName , user.password , 
 			inet_ntoa(user.userAddr.sin_addr),user.sockfd , YES, asctime(gmtime(&timeNow)));
 
-	ret = sqlite3_prepare(db , sql , strlen(sql) , &stmt , &tail);	
+	printf("insert sql = %s\n", sql);
+
+	/*第二次调用该函数之前要调用sqlite3_finalize销毁stmt*/
+	ret = sqlite3_prepare_v2(db , sql , strlen(sql) , &stmt , &tail);	
 	if(ret != SQLITE_OK)
 	{
-		ret = sqlite3_step(stmt);
-		sqlite3_finalize(stmt);
+		fprintf(stderr, "2 sqlite3_prepare_v2 failed, [%s]\n", sqlite3_errmsg(db));
 		sqlite3_close(db);
 		return FAILED;
 	}//if
 	
-	/*顺利注册*/
 	ret = sqlite3_step(stmt);
+	if (ret == SQLITE_ROW)
+	{
+		fprintf(stderr, "2 sqlite3_step failed, [%s]\n", sqlite3_column_text(stmt, 0));
+		printf("插入用户数据失败\n");
+		sqlite3_close(db);
+		return FAILED;
+	}
+
 	sqlite3_finalize(stmt);
 	sqlite3_close(db);
-	/*注册成功*/	
+		
 	return SUCCESS;
 }

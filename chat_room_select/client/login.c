@@ -45,12 +45,15 @@ int loginUser(int sockfd)
 	
 	printf("message.content = %s\n",message.content);
 	
-	printf("message.msgRet = %d\n", message.msgRet);
 	/*如果登陆成功，则进入聊天界面*/
 	if(SUCCESS == message.msgRet)
 	{
+		printf("登录成功，进入聊天室\n");
 		enterChat(&user , sockfd);
 	}//if
+
+	printf("message.msgRet = %d\n", message.msgRet);
+
 	return message.msgRet;
 }
 

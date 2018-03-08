@@ -103,6 +103,23 @@ typedef struct _ListNode{
 	struct _ListNode *next;
 }ListNode;
 
+typedef struct Node {
+	int data;			
+	struct Node *next;
+}Node, *pNode;
+
+typedef struct Queue {
+	pNode front;
+	pNode back;
+}Queue, *pQueue;
+
+typedef struct ClearSocketContext {
+	int sockfd;
+	fd_set allset;
+	int client_sockfd[FD_SETSIZE];
+	int i;
+	pthread_mutex_t pmtx;
+}*ClearSocketCtx;
 
 /*定义在线用户链表*/
 extern ListNode *userList;
@@ -132,3 +149,25 @@ extern int loginUser(Message *msg , int sockfd);
 
 /*register.c文件函数声明*/
 extern int registerUser(Message *msg , int sockfd);
+
+
+extern void init(pQueue pq);
+
+extern void destroy(pQueue pq);
+
+extern int is_empty(pQueue pq);
+
+extern int size(pQueue pq);
+
+extern int back(pQueue pq);
+
+extern int front(pQueue pq);
+
+extern void push(pQueue pq, int *e);
+
+extern void pop(pQueue pq, int *e);
+
+
+
+
+

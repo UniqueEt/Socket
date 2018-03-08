@@ -63,6 +63,11 @@ int main(void)
 	/*UserInfo*/
 	User user;	
 
+	//pQueue pq;
+
+	///*初始化fd队列*/
+	//init(pq);
+
 	/*初始化互斥锁和条件变量*/
 	pthread_cond_init(&pcond, NULL);
 	pthread_mutex_init(&pmtx, NULL);
@@ -110,10 +115,16 @@ int main(void)
 	/*将监听描述符加到allset中*/
 	FD_SET(listenfd , &allset);
 
+	///*将监听描述符加入fd队列*/
+	//push(pq, &listenfd);
+
 	/*(6) 接收客户链接*/
 	while(1)
 	{
+		pthread_mutex_lock(&pmtx);
 		rset = allset;
+		pthread_mutex_lock(&pmtx);
+
 		/*得到当前可读的文件描述符数*/
 		nready = select(maxfd+1 , &rset , NULL , NULL , 0);
 		
@@ -142,15 +153,27 @@ int main(void)
 					break;				
 				}//if
 			}//for
-
+			
 			if(i == FD_SETSIZE)
 			{		
 				perror("too many connection.\n");
 				exit(1);
 			}//if
 
+			//if (size(pq) == FD_SETSIZE)
+			//{
+			//	printf("the number of concurrent connections up to FD_SETSIZE\nwaitting for other clients to disconnect");
+			//	pthread_cond_wait(&pcond, &pmtx);
+			//}
+
 			/* 将来自客户的连接connfd加入描述符集 */
+			pthread_mutex_lock(&pmtx);
 			FD_SET(connfd , &allset);
+			pthread_mutex_lock(&pmtx);
+
+			///*将来自客户的连接connfd加入fd队列*/
+			//push(pq, &connfd);
+
 
 			/*新的连接描述符 -- for select*/
 			if(connfd > maxfd)
@@ -159,35 +182,55 @@ int main(void)
 			/*max index in client_sockfd[]*/
 			if(i > maxi)
 				maxi = i;
+			//maxi = size(pq);
 
 			/*no more readable descriptors*/
 			if(--nready <= 0)
 				continue;
 		}//if
 		/*接下来逐个处理连接描述符*/
-		for(i=0 ; i<=maxi ; ++i)
+		for(i=0 ; i <= maxi ; ++i)
 		{
-			if((sockfd = client_sockfd[i]) < 0)
+			//pop(pq, &sockfd);
+			//push(pq, &sockfd);
+
+			//if((sockfd = client_sockfd[i]) < 0)
+			//	continue;
+
+			pthread_mutex_lock(&pmtx);
+			sockfd = client_sockfd[i];
+			pthread_mutex_unlock(&pmtx);
+			if (sockfd < 0)
 				continue;
-				
+
 			if(FD_ISSET(sockfd , &rset))
 			{
 				/*如果当前没有可以读的套接字，退出循环*/
 				if(--nready < 0)
-					break;							
-				pthread_create(&pid , NULL , (void *)handleRequest , (void *)&sockfd);
+					break;		
+
+				ClearSocketCtx csc;
+				csc->sockfd = sockfd;
+				memset(&csc->allset, 0, sizeof(allset));
+				memcpy(&csc->allset, &allset, sizeof(allset));
+				memset(csc->client_sockfd, 0, FD_SETSIZE);
+				memcpy(csc->client_sockfd, client_sockfd, FD_SETSIZE);
+				csc->i = i;
+				csc->pmtx = pmtx;
+
+				pthread_create(&pid , NULL , handleRequest , (void*)csc);
 				pthread_detach(pid);
-				pthread_join(pid, NULL);
 			}//if
 
-			/*将sockfd从文件描述符集allset中移除*/
-			FD_CLR(sockfd , &allset);
-			client_sockfd[i] = -1;			
+			///*将sockfd从文件描述符集allset中移除*/
+			//FD_CLR(sockfd , &allset);
+			//client_sockfd[i] = -1;			
 		}//for
 
 		 /*等待子线程结束信号*/
 		pthread_mutex_lock(&pmtx);
-		pthread_cond_wait(&pcond, &pmtx);
+		pthread_cond_signal(&pcond);
+		
 		pthread_mutex_unlock(&pmtx);
 
 	}//while
@@ -202,7 +245,7 @@ int main(void)
 }
 
 /*处理客户请求的线程*/
-void* handleRequest(int *fd)
+void* handleRequest(ClearSocketCtx csc)
 {
 	int sockfd , ret , n;
 	/*声明消息变量*/
@@ -210,7 +253,7 @@ void* handleRequest(int *fd)
 	/*声明消息缓冲区*/
 	char buf[MAX_LINE];
 
-	sockfd = *fd;
+	sockfd = csc->sockfd;
 
 	memset(buf , 0 , MAX_LINE);
 	memset(&message , 0 , sizeof(message));
@@ -224,7 +267,7 @@ void* handleRequest(int *fd)
 		//关闭当前描述符，并清空描述符数组 
 		fflush(stdout);
 		close(sockfd);
-		*fd = -1;
+		csc->sockfd = -1;
 		printf("来自%s的退出请求！\n", inet_ntoa(message.sendAddr.sin_addr));		
 		return NULL;			
 	}//if				
@@ -287,6 +330,11 @@ void* handleRequest(int *fd)
 
 	close(sockfd);
 	//*fd = -1;
+
+	pthread_mutex_lock(&csc->pmtx);
+	FD_CLR(csc->sockfd, &csc->allset);
+	csc->client_sockfd[csc->i] = -1;
+	pthread_mutex_unlock(&csc->pmtx);
 
 	return NULL;
 }

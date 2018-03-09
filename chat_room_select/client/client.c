@@ -37,33 +37,33 @@ int main(int argc , char *argv[])
         exit(1);
     }//if
 
+	 /*(1) 创建套接字*/
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("socket error");
+		exit(1);
+	}//if
+
+	 /*(2) 设置链接服务器地址结构*/
+	bzero(&servaddr, sizeof(servaddr));		/*清空地址结构*/
+	servaddr.sin_family = AF_INET;				/*使用IPV4通信域*/
+	servaddr.sin_port = htons(PORT);			/*端口号转换为网络字节序*/
+												//servaddr.sin_addr = *((struct in_addr *)host->h_addr);		/*可接受任意地址*/
+	if (inet_pton(AF_INET, argv[1], &servaddr.sin_addr) < 0)
+	{
+		printf("inet_pton error for %s\n", argv[1]);
+		exit(1);
+	}//if
+
+	 /*(3) 发送链接服务器请求*/
+	if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+	{
+		perror("connect error");
+		exit(1);
+	}//if	
+
 	while(1)
 	{
-		 /*(1) 创建套接字*/
-		if((sockfd = socket(AF_INET , SOCK_STREAM , 0)) == -1)
-		{
-			perror("socket error");
-			exit(1);
-		}//if
-
-		/*(2) 设置链接服务器地址结构*/
-		bzero(&servaddr , sizeof(servaddr));		/*清空地址结构*/
-		servaddr.sin_family = AF_INET;				/*使用IPV4通信域*/
-		servaddr.sin_port = htons(PORT);			/*端口号转换为网络字节序*/
-		//servaddr.sin_addr = *((struct in_addr *)host->h_addr);		/*可接受任意地址*/
-		if(inet_pton(AF_INET , argv[1] , &servaddr.sin_addr) < 0)
-		{
-			printf("inet_pton error for %s\n",argv[1]);
-			exit(1);
-		}//if
-
-		 /*(3) 发送链接服务器请求*/
-		if( connect(sockfd , (struct sockaddr *)&servaddr , sizeof(servaddr)) < 0)
-		{
-			perror("connect error");
-			exit(1);
-		}//if	
-
 		/*(4) 显示聊天室主界面*/		
 		mainInterface();	
 		setbuf(stdin,NULL); //是linux中的C函数，主要用于打开和关闭缓冲机制

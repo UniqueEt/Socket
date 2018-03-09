@@ -119,3 +119,10 @@ extern int mainInterface();
 extern int helpInterface();
 extern void chatInterface(char userName[]);
 
+/*register.c*/
+int registerUser(int sockfd);
+
+/*login.c*/
+int loginUser(int sockfd);
+
+

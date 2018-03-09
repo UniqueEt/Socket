@@ -14,6 +14,7 @@
 **********************************************/
 int registerUser(Message *msg , int sockfd)
 {
+	printf("registerUser, 1\n");
 	int ret;
 	/*声明用户需要的注册信息*/
 	User user;
@@ -37,7 +38,12 @@ int registerUser(Message *msg , int sockfd)
 	memset(buf, 0, sizeof(buf));
 
 	/*接收用户注册信息*/
-	recv(sockfd , buf , sizeof(buf) , 0);
+	printf("registerUser, 2\n");
+	if ((ret = recv(sockfd, buf, sizeof(buf), 0)) <= 0)
+	{
+		printf("registerUser, recv failed, [%d]", errno);
+	}
+	printf("registerUser, 3\n");
 
 	memcpy(&user , buf , sizeof(user));
 	user.userAddr = (*msg).sendAddr;
@@ -119,6 +125,7 @@ int registerUser(Message *msg , int sockfd)
 
 	sqlite3_finalize(stmt);
 	sqlite3_close(db);
-		
+
+	printf("registerUser, 1\n");
 	return SUCCESS;
 }

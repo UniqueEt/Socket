@@ -38,16 +38,25 @@ int registerUser(int sockfd)
 	memcpy(buf , &user , sizeof(user));
 
 	/*发送注册请求消息*/
-	send(sockfd , buf , sizeof(buf) , 0);
-
+	if ((ret = send(sockfd, buf, sizeof(buf), 0)) <= 0)
+	{
+		perror("registerUser, send() failed, server error\n");
+		return -1;
+	}
+	printf("registerUser, send() succeed\n");
 	memset(buf , 0 , MAX_LINE);
 
 	/*接收注册响应消息*/
-	recv(sockfd , buf , sizeof(buf) , 0);
+	if ((ret = recv(sockfd, buf, sizeof(buf), 0)) <= 0)
+	{
+		printf("registerUser, recv() failed, server error: %s\n", errno);
+		return -1;
+	}
+	printf("registerUser, recv() succeed\n");
 
 	memset(&message , 0 , sizeof(message));
 	memcpy(&message , buf , sizeof(message));
 	
-	printf("register,message.content = %s\n",message.content);	
+	printf("registerUser,message.content = %s\n",message.content);	
 	return message.msgRet;
 }

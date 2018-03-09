@@ -7,22 +7,22 @@ server: $(objects)
 	cc -g -o client $(objects) -lsqlite3 -lpthread
 
 client.o: client.c config.h
-	cc -c client.c 
+	cc -g -c client.c 
 
 register.o: register.c config.h
-	cc -c register.c
+	cc -g -c register.c
 
 login.o: login.c config.h
-	cc -c login.c
+	cc -g -c login.c
 
 interface.o: interface.c config.h
-	cc -c interface.c
+	cc -g -c interface.c
 
 chat.o: chat.c config.h
-	cc -c chat.c
+	cc -g -c chat.c
 
 config.o: config.c config.h
-	cc -c config.c
+	cc -g -c config.c
 #比较稳健的clean做法，表示clean是一个伪目标
 .PHONY: clean
 

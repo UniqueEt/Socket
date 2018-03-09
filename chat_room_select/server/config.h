@@ -119,13 +119,26 @@ typedef struct ClearSocketContext {
 	int client_sockfd[FD_SETSIZE];
 	int i;
 	pthread_mutex_t pmtx;
-}*ClearSocketCtx;
+}ClearSocketContext, *ClearSocketCtx;
+
+/*
+* ClientCtx用作主线程和子线程通信
+* 目的是在子线程断开与客户端连接后，回收客户端sockfd
+* 该结构体在主线程malloc，子线程free
+*/
+typedef struct ConnectedClientContext{
+	int sockfd;				//客户端套接字文件描述符
+	void *sock_array;			//已连接客户端套接字数组
+	int index;				//已连接客户端套接字在数组的位置
+	pthread_mutex_t *pmtxp;	//主线程和子线程共享同一互斥量
+}ClientCtx, *ClientCtxp;
 
 /*定义在线用户链表*/
 extern ListNode *userList;
 
 /*server.c 客户请求处理函数*/
-extern void* handleRequest(int *fd);
+//extern void* handleRequest(int *fd);
+extern void* handleRequest(void* csc);
 
 /*config.c文件函数声明*/
 extern char *stateMsg(int stateRet);

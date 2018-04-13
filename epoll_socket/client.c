@@ -77,92 +77,118 @@ ssize_t readline(int fd, char *vptr, size_t maxlen)
 /*普通客户端消息处理函数*/
 void str_cli(int sockfd)
 {
+	ssize_t n;
 	/*发送和接收缓冲区*/
-	char sendline[MAX_LINE] , recvline[MAX_LINE];
-	while(fgets(sendline , MAX_LINE , stdin) != NULL)	
+	char sendline[MAX_LINE], recvline[MAX_LINE];
+	bzero(sendline, MAX_LINE);
+
+	while (fgets(sendline, MAX_LINE, stdin) != NULL)
 	{
-		write(sockfd , sendline , strlen(sendline));
-
-		bzero(recvline , MAX_LINE);
-		if(readline(sockfd , recvline , MAX_LINE) == 0)
+		if ((n = write(sockfd, sendline, strlen(sendline))) < 0)
 		{
-			perror("server terminated prematurely");
-			exit(1);
-		}//if
-
-		if(fputs(recvline , stdout) == EOF)
+			perror("write error\n");
+			exit(-1);
+		}
+		else
 		{
-			perror("fputs error");
-			exit(1);
-		}//if
+			printf("write %d bytes to server!\n", n);
+		}
 
-		bzero(sendline , MAX_LINE);
+		bzero(recvline, MAX_LINE);
+		if ((n = readline(sockfd, recvline, MAX_LINE)) < 0)
+		{
+			perror("readline error!\n");
+			exit(-1);
+		}//if
+		else if (n == 0)
+		{
+			perror("server terminated prematurely\n");
+			return;
+		}
+		else
+		{
+			printf("read %d bytes from server, message:\n", n);
+			if (fputs(recvline, stdout) == EOF || fputc('\n', stdout) == EOF)
+			{
+				perror("fputs error");
+				exit(1);
+			}//if
+			;
+		}
 	}//while
 }
 
-void str2_cli(int sockfd)
-{
-	int i, nfds, nread;
-	char sendline[MAX_LINE], recvline[MAX_LINE];
-	struct epoll_event ev, ev_in, event[MAX_EVENT];
-
-	int infd = fileno(stdin);
-
-	int epfd = epoll_create(CONNECT_SIZE);
-
-	setNonblocking(sockfd);
-	/*设置监听描述符*/
-	ev.data.fd = sockfd;
-	/*设置处理事件类型*/
-	ev.events = EPOLLIN | EPOLLET;
-
-	setNonblocking(infd);
-	ev_in.data.fd = infd;
-	ev_in.events = EPOLLIN | EPOLLET;
-	/*注册监听标准输入流stdin事件*/
-	epoll_ctl(epfd, EPOLL_CTL_ADD, infd, &ev_in);
-	/*注册监听连接套接字事件*/
-	epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev);
-
-	while (1)
-	{
-		nfds = epoll_wait(epfd, event, CONNECT_SIZE, -1);
-
-		printf("events triggered,nfds = %d\n", nfds);
-
-		for (i = 0; i < nfds; ++i)
-		{
-			if (event[i].data.fd == infd)
-			{
-				if ((nread = read(infd, sendline, MAX_LINE)) == 0)
-				{
-					printf("read nothing\n");
-					close(infd);
-					return;
-				}
-				printf("send message to server\n");
-
-				//即使服务端强制中断（ctrl+z），write还是可以正常向sockfd写入
-				write(sockfd, sendline, nread);
-			}
-			else if (event[i].data.fd == sockfd)
-			{
-				//貌似服务端关闭了套接字会向客户端发送EOF,但是如果是服务器强制中断（ctrl+z）,sockfd状态不会改变，走不到这里
-				if (readline(sockfd, recvline, MAX_LINE) == 0)
-				{
-					printf("server closed prematurely\n");
-					exit(1);
-				}
-				printf("receive message from server\n");
-				if (fputs(recvline, stdout) == EOF)
-				{
-					perror("fputs error\n");
-					exit(1);
-				}
-			}
-		}
-	}
-}
+//void str2_cli(int sockfd)
+//{
+//	int i, nfds, nread;
+//	char sendline[MAX_LINE], recvline[MAX_LINE];
+//	struct epoll_event ev, ev_in, event[MAX_EVENT];
+//
+//	int infd = fileno(stdin);
+//
+//	int epfd = epoll_create(CONNECT_SIZE);
+//
+//	setNonblocking(sockfd);
+//	/*设置监听描述符*/
+//	ev.data.fd = sockfd;
+//	/*设置处理事件类型*/
+//	ev.events = EPOLLIN | EPOLLET;
+//
+//	setNonblocking(infd);
+//	ev_in.data.fd = infd;
+//	ev_in.events = EPOLLIN | EPOLLET;
+//	/*注册监听标准输入流stdin事件*/
+//	epoll_ctl(epfd, EPOLL_CTL_ADD, infd, &ev_in);
+//	/*注册监听连接套接字事件*/
+//	epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev);
+//
+//	while (1)
+//	{
+//		nfds = epoll_wait(epfd, event, CONNECT_SIZE, -1);
+//
+//		printf("events triggered,nfds = %d\n", nfds);
+//
+//		for (i = 0; i < nfds; ++i)
+//		{
+//			if (event[i].data.fd == infd)
+//			{
+//				if ((nread = read(infd, sendline, MAX_LINE)) == 0)
+//				{
+//					printf("read nothing\n");
+//					close(infd);
+//					return;
+//				}
+//				printf("send message to server\n");
+//
+//				//即使服务端强制中断（ctrl+z），write还是可以正常向sockfd写入
+//				write(sockfd, sendline, nread);
+//			}
+//			else if (event[i].data.fd == sockfd)
+//			{
+//				if ((nread = readline(sockfd, recvline, MAX_LINE)) < 0)
+//				{
+//					perror("read error!\n");
+//					return;
+//				}
+//				//貌似服务端关闭了套接字会向客户端发送EOF,但是如果是服务器强制中断（ctrl+z）,sockfd状态不会改变，走不到这里
+//				else if (nread == 0)
+//				{
+//					printf("server closed prematurely\n");
+//					exit(1);
+//				}
+//				else
+//				{
+//					printf("receive message from server\n");
+//					if (fputs(recvline, stdout) == EOF)
+//					{
+//						perror("fputs error\n");
+//						exit(1);
+//					}
+//				}
+//			}
+//		}
+//	}
+//}
 
 int main(int argc , char **argv)
 {
@@ -201,10 +227,10 @@ int main(int argc , char **argv)
         exit(1);
     }//if
 
-	/*调用消息处理函数*/
-	//str_cli(sockfd);	
-	/*调用epoll技术处理消息函数*/
-	str2_cli(sockfd);
+	//调用消息处理函数
+	str_cli(sockfd);	
+	//调用epoll技术处理消息函数
+	//str2_cli(sockfd);
 
 	exit(0);
 }

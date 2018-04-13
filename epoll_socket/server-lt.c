@@ -24,106 +24,106 @@
 void setNonblocking(int sockfd)
 {
 	int opts;
-    opts=fcntl(sockfd,F_GETFL);
-    if(opts<0)
-    {
-        perror("fcntl(sock,GETFL)");
-        return;
-    }//if
+	opts = fcntl(sockfd, F_GETFL);
+	if (opts<0)
+	{
+		perror("fcntl(sock,GETFL)");
+		return;
+	}//if
 
-    opts = opts|O_NONBLOCK;
-    if(fcntl(sockfd,F_SETFL,opts)<0)
-    {
- 		perror("fcntl(sock,SETFL,opts)");
-        return;
-    }//if
+	opts = opts | O_NONBLOCK;
+	if (fcntl(sockfd, F_SETFL, opts)<0)
+	{
+		perror("fcntl(sock,SETFL,opts)");
+		return;
+	}//if
 }
 
-int main(int argc , char **argv)
+int main(int argc, char **argv)
 {
 	int i, listenfd, connfd, sockfd, epfd, nfds;
 
 	ssize_t n, ret;
-		
+
 	char buf[MAX_LINE];
 
 	socklen_t clilen;
 
-	struct sockaddr_in servaddr , cliaddr;
+	struct sockaddr_in servaddr, cliaddr;
 
 	/*声明epoll_event结构体变量，ev用于注册事件，数组用于回传要处理的事件*/
 	struct epoll_event ev, events[20];
 
 	/*(1) 得到监听描述符*/
-	listenfd = socket(AF_INET , SOCK_STREAM , 0);
+	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	setNonblocking(listenfd);
 
-	/*生成用于处理accept的epoll专用文件描述符*/	
-	epfd = epoll_create(CONNECT_SIZE);
-	/*设置监听描述符*/
-	ev.data.fd = listenfd;
-	/*设置处理事件类型，边角触发*/
-	ev.events = EPOLLIN | EPOLLET;
-	/*注册事件*/
-	epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);		
-
-	/*(2) 绑定套接字*/	
-	bzero(&servaddr , sizeof(servaddr));
+	/*(2) 绑定套接字*/
+	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(PORT);
 
-	bind(listenfd , (struct sockaddr *)&servaddr , sizeof(servaddr));
+	bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
 	/*(3) 监听*/
-	listen(listenfd , LISTENQ);
+	listen(listenfd, LISTENQ);
+
+	/*生成用于处理accept的epoll专用文件描述符*/
+	epfd = epoll_create(CONNECT_SIZE);
+	/*设置监听描述符*/
+	ev.data.fd = listenfd;
+	/*设置处理事件类型，LT mode*/
+	ev.events = EPOLLIN;
+	/*注册事件*/
+	epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);
 
 	/*(4) 进入服务器接收请求死循环*/
-	while(1)
+	while (1)
 	{
 		/*等待事件发生*/
-		nfds = epoll_wait(epfd , events , CONNECT_SIZE , -1);	//timeout=-1表示无限等待
-		if(nfds <= 0)
+		nfds = epoll_wait(epfd, events, CONNECT_SIZE, -1);	//timeout=-1表示无限等待
+		if (nfds <= 0)
 			continue;
-		printf("nfds = %d\n" , nfds);
-	
+		printf("nfds = %d\n", nfds);
+
 		/*处理发生的事件*/
-		for(i=0 ; i<nfds ; ++i)
+		for (i = 0; i<nfds; ++i)
 		{
 			/*检测到用户链接*/
-			if(events[i].data.fd == listenfd)
-			{	
+			if (events[i].data.fd == listenfd)
+			{
 				/*接收客户端的请求*/
 				clilen = sizeof(cliaddr);
 
-				if((connfd = accept(listenfd , (struct sockaddr *)&cliaddr , &clilen)) < 0)
+				if ((connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen)) < 0)
 				{
 					perror("accept error.\n");
 					exit(1);
 				}//if		
 
-				printf("accpet a new client: %s:%d\n", inet_ntoa(cliaddr.sin_addr) , cliaddr.sin_port);
-			
+				printf("accpet a new client: %s:%d\n", inet_ntoa(cliaddr.sin_addr), cliaddr.sin_port);
+
 				/*设置为非阻塞*/
 				setNonblocking(connfd);
 				ev.data.fd = connfd;
-				ev.events = EPOLLIN | EPOLLET;
-				epoll_ctl(epfd , EPOLL_CTL_ADD , connfd , &ev);
+				ev.events = EPOLLIN;	//LT mode
+				epoll_ctl(epfd, EPOLL_CTL_ADD, connfd, &ev);
 			}//if
-			/*如果是已链接用户，并且收到数据，进行读入*/
-			else if(events[i].events & EPOLLIN)
+			 /*如果是已链接用户，并且收到数据，进行读入*/
+			else if (events[i].events & EPOLLIN)
 			{
 
-				if((sockfd = events[i].data.fd) < 0)
+				if ((sockfd = events[i].data.fd) < 0)
 					continue;
-				bzero(buf , MAX_LINE);
+				bzero(buf, MAX_LINE);
 				printf("reading the socket~~~\n");
 				if ((n = read(sockfd, buf, MAX_LINE)) < 0)
 				{
 					perror("read error!\n");
 					continue;
 				}
-				else if(n == 0)
+				else if (n == 0)
 				{
 					printf("client close the socket,sockfd = %d\n", sockfd);
 					close(sockfd);
@@ -132,19 +132,21 @@ int main(int argc , char **argv)
 				else
 				{
 					buf[n] = '\0';
-					printf("clint[%d] send message: %s\n", i , buf);
-				
+					printf("clint[%d] send message: %s\n", i, buf);
+
 					/*设置用于注册写操作文件描述符和事件*/
 					ev.data.fd = sockfd;
-					ev.events = EPOLLOUT| EPOLLET;	
-					epoll_ctl(epfd , EPOLL_CTL_MOD , sockfd , &ev);			
+					ev.events = EPOLLOUT;
+					epoll_ctl(epfd, EPOLL_CTL_MOD, sockfd, &ev);
 				}//else											
 			}//else
-			else if(events[i].events & EPOLLOUT)
+			else if (events[i].events & EPOLLOUT)
 			{
-				if((sockfd = events[i].data.fd) < 0)
-				continue;
-				if((ret = write(sockfd , buf , n)) != n)	
+				/*printf("LT mode triggled\n");
+				sleep(5);*/
+				if ((sockfd = events[i].data.fd) < 0)
+					continue;
+				if ((ret = write(sockfd, buf, n)) != n)
 				{
 					printf("error writing to the sockfd!\n");
 					break;
@@ -152,9 +154,9 @@ int main(int argc , char **argv)
 				printf("write message to client\n");
 				/*设置用于读的文件描述符和事件*/
 				ev.data.fd = sockfd;
-				ev.events = EPOLLIN | EPOLLET;
+				ev.events = EPOLLIN;
 				/*修改*/
-				epoll_ctl(epfd , EPOLL_CTL_MOD , sockfd , &ev);				
+				epoll_ctl(epfd, EPOLL_CTL_MOD, sockfd, &ev);
 			}//else
 		}//for
 	}//while

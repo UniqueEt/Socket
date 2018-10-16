@@ -21,17 +21,11 @@
 int main(int argc, char **argv)
 {
 	int i, maxi, maxfd, listenfd, connfd, sockfd;
-
 	int nready, client[FD_SETSIZE];
-
 	ssize_t n, ret;
-
 	fd_set rset, allset;
-
 	char buf[MAX_LINE];
-
 	socklen_t clilen;
-
 	struct sockaddr_in servaddr, cliaddr;
 
 	/*(1) 得到监听描述符*/

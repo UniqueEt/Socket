@@ -62,7 +62,7 @@ int main(int argc , char **argv)
 	epfd = epoll_create(CONNECT_SIZE);
 	/*设置监听描述符*/
 	ev.data.fd = listenfd;
-	/*设置处理事件类型*/
+	/*设置处理事件类型，边角触发*/
 	ev.events = EPOLLIN | EPOLLET;
 	/*注册事件*/
 	epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);		
@@ -82,11 +82,11 @@ int main(int argc , char **argv)
 	while(1)
 	{
 		/*等待事件发生*/
-		nfds = epoll_wait(epfd , events , CONNECT_SIZE , -1);
+		nfds = epoll_wait(epfd , events , CONNECT_SIZE , -1);	//timeout=-1表示无限等待
 		if(nfds <= 0)
 			continue;
-	
 		printf("nfds = %d\n" , nfds);
+	
 		/*处理发生的事件*/
 		for(i=0 ; i<nfds ; ++i)
 		{
@@ -111,18 +111,26 @@ int main(int argc , char **argv)
 				epoll_ctl(epfd , EPOLL_CTL_ADD , connfd , &ev);
 			}//if
 			/*如果是已链接用户，并且收到数据，进行读入*/
-			else if(events[i].events & EPOLLIN){
+			else if(events[i].events & EPOLLIN)
+			{
 
 				if((sockfd = events[i].data.fd) < 0)
 					continue;
 				bzero(buf , MAX_LINE);
 				printf("reading the socket~~~\n");
-				if((n = read(sockfd , buf , MAX_LINE)) <= 0)
+				if ((n = read(sockfd, buf, MAX_LINE)) < 0)
 				{
+					perror("read error!\n");
+					continue;
+				}
+				else if(n == 0)
+				{
+					printf("client close the socket,sockfd = %d\n", sockfd);
 					close(sockfd);
 					events[i].data.fd = -1;
 				}//if
-				else{
+				else
+				{
 					buf[n] = '\0';
 					printf("clint[%d] send message: %s\n", i , buf);
 				
@@ -141,6 +149,7 @@ int main(int argc , char **argv)
 					printf("error writing to the sockfd!\n");
 					break;
 				}//if
+				printf("write message to client\n");
 				/*设置用于读的文件描述符和事件*/
 				ev.data.fd = sockfd;
 				ev.events = EPOLLIN | EPOLLET;
